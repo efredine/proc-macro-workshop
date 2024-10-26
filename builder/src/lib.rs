@@ -32,19 +32,22 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let builder_methods = fields.iter().map(|f| {
         let name = f.ident.as_ref().unwrap();
         let ty = &f.ty;
-        if is_option(ty) {
-            let inner_ty = get_inner_type(ty);
-            quote! {
-                pub fn #name(&mut self, #name: #inner_ty) -> &mut Self {
-                    self.#name = Some(Some(#name));
-                    self
+        let option_inner_ty = get_option_inner_type(ty);
+        match option_inner_ty {
+            Some(inner_ty) => {
+                quote! {
+                    pub fn #name(&mut self, #name: #inner_ty) -> &mut Self {
+                        self.#name = Some(Some(#name));
+                        self
+                    }
                 }
             }
-        } else {
-            quote! {
-                pub fn #name(&mut self, #name: #ty) -> &mut Self {
-                    self.#name = Some(#name);
-                    self
+            None => {
+                quote! {
+                    pub fn #name(&mut self, #name: #ty) -> &mut Self {
+                        self.#name = Some(#name);
+                        self
+                    }
                 }
             }
         }
@@ -53,13 +56,17 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let assign_fields = fields.iter().map(|f| {
         let name = f.ident.as_ref().unwrap();
         let ty = &f.ty;
-        if is_option(ty) {
-            quote! {
-                #name: self.#name.clone().unwrap_or(None)
+        let option_inner_ty = get_option_inner_type(ty);
+        match option_inner_ty {
+            Some(_) => {
+                quote! {
+                    #name: self.#name.clone().unwrap_or(None)
+                }
             }
-        } else {
-            quote! {
-                #name: self.#name.clone().ok_or(concat!(stringify!(#name), " is not set"))?
+            None => {
+                quote! {
+                    #name: self.#name.clone().ok_or(concat!(stringify!(#name), " is not set"))?
+                }
             }
         }
     });
@@ -91,30 +98,17 @@ pub fn derive(input: TokenStream) -> TokenStream {
     expanded.into()
 }
 
-fn is_option(ty: &Type) -> bool {
-    if let Type::Path(TypePath { qself: None, path }) = ty {
+fn get_option_inner_type(ty: &Type) -> Option<&Type> {
+    if let Type::Path(TypePath { qself: _none, path }) = ty {
         if let Some(segment) = path.segments.first() {
             if segment.ident == "Option" {
                 if let PathArguments::AngleBracketed(AngleBracketedGenericArguments { args, .. }) = &segment.arguments {
-                    if let Some(GenericArgument::Type(_)) = args.first() {
-                        return true;
+                    if let Some(GenericArgument::Type(inner_type)) = args.first() {
+                        return Some(inner_type);
                     }
                 }
             }
         }
     }
-    false
-}
-
-fn get_inner_type(ty: &Type) -> &Type {
-    if let Type::Path(TypePath { qself: None, path }) = ty {
-        if let Some(segment) = path.segments.first() {
-            if let PathArguments::AngleBracketed(AngleBracketedGenericArguments { args, .. }) = &segment.arguments {
-                if let Some(GenericArgument::Type(inner_ty)) = args.first() {
-                    return inner_ty;
-                }
-            }
-        }
-    }
-    panic!("Expected Option type");
+    None
 }
