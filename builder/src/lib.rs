@@ -54,9 +54,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
         
         impl #builder_ident {
             #(#builder_methods)*
-        }
-        
-        impl #builder_ident {
+            
             pub fn build(&mut self) -> Result<#ident, Box<dyn std::error::Error>> {
                 Ok(#ident {
                     #(#assign_fields),*
