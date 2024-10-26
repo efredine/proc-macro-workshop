@@ -40,6 +40,13 @@ pub fn derive(input: TokenStream) -> TokenStream {
         }
     });
     
+    let assign_fields = fields.iter().map(|f| {
+        let name = f.ident.as_ref().unwrap();
+        quote! {
+            #name: self.#name.clone().ok_or(concat!(stringify!(#name), " is not set"))?
+        }
+    });
+    
     let expanded = quote! {
         pub struct #builder_ident {
             #(#builder_fields),*
@@ -47,6 +54,14 @@ pub fn derive(input: TokenStream) -> TokenStream {
         
         impl #builder_ident {
             #(#builder_methods)*
+        }
+        
+        impl #builder_ident {
+            pub fn build(&mut self) -> Result<#ident, Box<dyn std::error::Error>> {
+                Ok(#ident {
+                    #(#assign_fields),*
+                })
+            }
         }
 
         impl #ident {
