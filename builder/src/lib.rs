@@ -1,49 +1,47 @@
 use proc_macro::TokenStream;
+use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
+
 #[proc_macro_derive(Builder)]
 pub fn derive(input: TokenStream) -> TokenStream {
-    eprintln!("input: {:?}", input);
-    let _ = input;
     let input = parse_macro_input!(input as DeriveInput);
-    let attr_length = input.attrs.len();
-    eprintln!("attr_length: {attr_length}");
-    let vis = input.vis;
-    match vis {
-        syn::Visibility::Public(s) => eprintln!("vis: public, {:?}", s.span.source_text()),
-        syn::Visibility::Restricted(_) => eprintln!("vis: restricted"),
-        syn::Visibility::Inherited => eprintln!("vis: inherited"),
-    }
     let ident = input.ident;
-    eprintln!("ident: {ident}");
-    let generics = input.generics;
-    eprintln!(
-        "generics: lt_token?: {}, gt_token?: {}, where_clause?: {}, params_length: {}",
-        generics.lt_token.is_some(),
-        generics.gt_token.is_some(),
-        generics.where_clause.is_some(),
-        generics.params.len()
-    );
-    let data = input.data;
-    match data {
-        syn::Data::Struct(s) => {
-            eprintln!("data: struct, fields_length: {}", s.fields.len());
-            s.fields.iter().for_each(|f| {
-                eprintln!("field: {:?}", f.ident);
-            });
+    let builder_ident = syn::Ident::new(&format!("{}Builder", ident), ident.span());
+
+    let fields = if let syn::Data::Struct(data) = input.data {
+        data.fields
+    } else {
+        unimplemented!();
+    };
+
+    let builder_fields = fields.iter().map(|f| {
+        let name = f.ident.as_ref().unwrap();
+        let ty = &f.ty;
+        quote! {
+            #name: Option<#ty>
         }
-        syn::Data::Enum(e) => {
-            eprintln!("data: enum, variants_length: {}", e.variants.len());
+    });
+
+    let builder_fields_init = fields.iter().map(|f| {
+        let name = f.ident.as_ref().unwrap();
+        quote! {
+            #name: None
         }
-        syn::Data::Union(u) => {
-            eprintln!("data: union, fields_length: {}", u.fields.named.len());
+    });
+
+    let expanded = quote! {
+        pub struct #builder_ident {
+            #(#builder_fields),*
         }
-    }
-    // let expanded = quote! {
-    //     impl #name {
-    //         pub fn builder() -> #nameBuilder {
-    //             #nameBuilder::default()
-    //         }
-    //     }
-    // };
-    TokenStream::new()
+
+        impl #ident {
+            pub fn builder() -> #builder_ident {
+                #builder_ident {
+                    #(#builder_fields_init),*
+                }
+            }
+        }
+    };
+
+    expanded.into()
 }
