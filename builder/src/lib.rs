@@ -99,7 +99,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
 }
 
 fn get_option_inner_type(ty: &Type) -> Option<&Type> {
-    if let Type::Path(TypePath { qself: _none, path }) = ty {
+    if let Type::Path(TypePath { path, .. }) = ty {
         if let Some(segment) = path.segments.first() {
             if segment.ident == "Option" {
                 if let PathArguments::AngleBracketed(AngleBracketedGenericArguments { args, .. }) = &segment.arguments {
