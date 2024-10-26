@@ -28,10 +28,25 @@ pub fn derive(input: TokenStream) -> TokenStream {
             #name: None
         }
     });
-
+    
+    let builder_methods = fields.iter().map(|f| {
+        let name = f.ident.as_ref().unwrap();
+        let ty = &f.ty;
+        quote! {
+            pub fn #name(&mut self, #name: #ty) -> &mut Self {
+                self.#name = Some(#name);
+                self
+            }
+        }
+    });
+    
     let expanded = quote! {
         pub struct #builder_ident {
             #(#builder_fields),*
+        }
+        
+        impl #builder_ident {
+            #(#builder_methods)*
         }
 
         impl #ident {
